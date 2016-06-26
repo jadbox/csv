@@ -99,6 +99,7 @@ var (
 // non-doubled quote may appear in a quoted field.
 //
 // If TrimLeadingSpace is true, leading white space in a field is ignored.
+// Terminator is the seperator between record sets. Default is new line '\n' rune.
 type Reader struct {
 	Comma            rune // field delimiter (set to ',' by NewReader)
 	Comment          rune // comment character for start of line
@@ -110,6 +111,7 @@ type Reader struct {
 	column           int
 	r                *bufio.Reader
 	field            bytes.Buffer
+	terminator		 rune
 }
 
 // NewReader returns a new Reader that reads from r.
@@ -117,6 +119,7 @@ func NewReader(r io.Reader) *Reader {
 	return &Reader{
 		Comma: ',',
 		r:     bufio.NewReader(r),
+		terminator: '\n',
 	}
 }
 
@@ -183,7 +186,7 @@ func (r *Reader) readRune() (rune, error) {
 	if r1 == '\r' {
 		r1, _, err = r.r.ReadRune()
 		if err == nil {
-			if r1 != '\n' {
+			if r1 != r.terminator {
 				r.r.UnreadRune()
 				r1 = '\r'
 			}
@@ -224,7 +227,7 @@ func (r *Reader) parseRecord() (fields []string, err error) {
 	}
 
 	if r.Comment != 0 && r1 == r.Comment {
-		return nil, r.skip('\n')
+		return nil, r.skip(r.terminator)
 	}
 	r.r.UnreadRune()
 
@@ -234,7 +237,7 @@ func (r *Reader) parseRecord() (fields []string, err error) {
 		if haveField {
 			fields = append(fields, r.field.String())
 		}
-		if delim == '\n' || err == io.EOF {
+		if delim == r.terminator || err == io.EOF {
 			return fields, err
 		} else if err != nil {
 			return nil, err
@@ -244,12 +247,12 @@ func (r *Reader) parseRecord() (fields []string, err error) {
 
 // parseField parses the next field in the record.  The read field is
 // located in r.field.  Delim is the first character not part of the field
-// (r.Comma or '\n').
+// (r.Comma or r.terminator).
 func (r *Reader) parseField() (haveField bool, delim rune, err error) {
 	r.field.Reset()
 
 	r1, err := r.readRune()
-	for err == nil && r.TrimLeadingSpace && r1 != '\n' && unicode.IsSpace(r1) {
+	for err == nil && r.TrimLeadingSpace && r1 != r.terminator && unicode.IsSpace(r1) {
 		r1, err = r.readRune()
 	}
 
@@ -264,7 +267,7 @@ func (r *Reader) parseField() (haveField bool, delim rune, err error) {
 	case r.Comma:
 		// will check below
 
-	case '\n':
+	case r.terminator:
 		// We are a trailing empty field or a blank line
 		if r.column == 0 {
 			return false, r1, nil
@@ -291,7 +294,7 @@ func (r *Reader) parseField() (haveField bool, delim rune, err error) {
 				if err != nil || r1 == r.Comma {
 					break Quoted
 				}
-				if r1 == '\n' {
+				if r1 == r.terminator {
 					return true, r1, nil
 				}
 				if r1 != '"' {
@@ -302,7 +305,7 @@ func (r *Reader) parseField() (haveField bool, delim rune, err error) {
 					// accept the bare quote
 					r.field.WriteRune('"')
 				}
-			case '\n':
+			case r.terminator:
 				r.line++
 				r.column = -1
 			}
@@ -317,7 +320,7 @@ func (r *Reader) parseField() (haveField bool, delim rune, err error) {
 			if err != nil || r1 == r.Comma {
 				break
 			}
-			if r1 == '\n' {
+			if r1 == r.terminator {
 				return true, r1, nil
 			}
 			if !r.LazyQuotes && r1 == '"' {
