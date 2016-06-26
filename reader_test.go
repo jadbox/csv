@@ -23,7 +23,7 @@ var readTests = []struct {
 	LazyQuotes       bool
 	TrailingComma    bool
 	TrimLeadingSpace bool
-	terminator rune
+	Terminator 			 rune
 
 	Error  string
 	Line   int // Expected error line if != 0
@@ -255,7 +255,7 @@ x,,,
 		Name:             "Custom Terminator",
 		TrailingComma:    false,
 		TrimLeadingSpace: true,
-		terminator: '$',
+		Terminator: '$',
 		Input:            "a,b,z$c,d,e$x,y,z",
 		Output: [][]string{
 			{"a", "b", "z"},
@@ -280,8 +280,8 @@ func TestRead(t *testing.T) {
 		if tt.Comma != 0 {
 			r.Comma = tt.Comma
 		}
-		if tt.terminator != 0 {
-			r.terminator = tt.terminator
+		if tt.Terminator != 0 {
+			r.Terminator = tt.Terminator
 		}
 		out, err := r.ReadAll()
 		perr, _ := err.(*ParseError)
